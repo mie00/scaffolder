@@ -1,0 +1,34 @@
+{
+  "name": "scaffolder",
+  "version": "1.0.0",
+  "description": "A directory templating language",
+  "main": "index.js",
+  "directories": {
+    "example": "examples"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mie00/scaffolder.git"
+  },
+  "keywords": [
+    "scaffolding",
+    "directory",
+    "builder",
+    "directory",
+    "templating"
+  ],
+  "author": "Mohamed Elawadi <mohamed@elawdai.net>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/mie00/scaffolder/issues"
+  },
+  "homepage": "https://github.com/mie00/scaffolder#readme",
+  "dependencies": {
+    "bluebird": "^3.5.0",
+    "lodash": "^4.17.4",
+    "mkdirp": "^0.5.1"
+  }
+}
