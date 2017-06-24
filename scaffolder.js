@@ -80,7 +80,7 @@ function utils_parse_scope(obj, scopestr) {
                 if (_.isArray(e)) {
                     subres = subres.concat(e);
                 } else if (_.isObject(e)) {
-                    subres = subres.concat(_.values(e));
+                    subres = subres.concat(_.values(_.omit(e, _.values(keys))));
                 }
             } else if (ch == '{}') {
                 if (_.isArray(e)) {
@@ -88,7 +88,7 @@ function utils_parse_scope(obj, scopestr) {
                         res.push(utils_create_kv(k, v));
                     }, subres);
                 } else if (_.isObject(e)) {
-                    _.transform(e, (result, k, v) => {
+                    _.transform(_.omit(e, _.values(keys)), (result, k, v) => {
                         result.push(utils_create_kv(k, v));
                     }, subres);
                 }
