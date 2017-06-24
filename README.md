@@ -36,7 +36,8 @@ return fs.readFileAsync(args.ctx, scaffolder.config.encoding)
 2. Diff writer (A writer that checks if it exists and try to apply the new changes only)
 3. Unit tests
 4. Add the ability to change the used templating language
-5. NPM package
+6. Add exec to exeucte commands in the current scope
+7. NPM package
 
 ## LICENSE
 
