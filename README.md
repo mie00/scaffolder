@@ -11,7 +11,10 @@ npm install mie00/scaffolder
 ## Example
 
 ```js
+var Promise = require('bluebird');
 var scaffolder = require('scaffolder');
+var fs = Promise.promisifyAll(require('fs'));
+
 var args = {
     'reader': 'fs',
     'writer': 'json',
