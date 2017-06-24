@@ -68,7 +68,7 @@ function utils_create_kv(k, v) {
 
 function utils_parse_scope(obj, scopestr) {
     /* jshint -W083 */
-    var scope = scopestr.replace('[]', '.[]').replace('{}', '.{}').split('.');
+    var scope = scopestr.replace('[]', '.[]').replace('{}', '.{}').replace(/^\./, '').split('.');
     var res = [obj];
     var old;
     for (var ch of scope) {
@@ -83,12 +83,12 @@ function utils_parse_scope(obj, scopestr) {
                     subres = subres.concat(_.values(_.omit(e, _.values(keys))));
                 }
             } else if (ch == '{}') {
-                if (_.isArray(e)) {
-                    _.transform(e, (res, v, k) => {
+                if (_.isArray(e[keys.self])) {
+                    _.transform(e[keys.self], (res, v, k) => {
                         res.push(utils_create_kv(k, v));
                     }, subres);
-                } else if (_.isObject(e)) {
-                    _.transform(_.omit(e, _.values(keys)), (result, k, v) => {
+                } else if (_.isObject(e[keys.self])) {
+                    _.transform(_.omit(e[keys.self], _.values(keys)), (result, v, k) => {
                         result.push(utils_create_kv(k, v));
                     }, subres);
                 }
@@ -96,21 +96,27 @@ function utils_parse_scope(obj, scopestr) {
                 subres.push(e[ch]);
             }
             for (var e2 of subres) {
-                if (!_.isObject(e2)) {
-                    var tmp = {};
-                    tmp[keys.self] = e2;
-                    e2 = tmp;
-                } else {
-                    e2[keys.self] = e2;
-                }
-                e2[keys.parent] = e;
-                e2[keys.root] = e[keys.root] || e;
-                res.push(e2);
+                res.push(utils_normailze_elem(e2, e));
             }
         }
     }
     return res;
 }
+
+function utils_normailze_elem(elem, parent) {
+    var root = parent?parent[keys.root] || parent:elem;
+    if (!_.isObject(elem)) {
+        var tmp = {};
+        tmp[keys.self] = elem;
+        elem = tmp;
+    } else {
+        elem[keys.self] = elem;
+    }
+    elem[keys.parent] = parent;
+    elem[keys.root] = root;
+    return elem;
+}
+
 
 function utils_parse_recursive(optss, res) {
     if (optss.length === 0)
@@ -201,6 +207,7 @@ function parse_scaf(content, originalname, obj, parentname) {
     }
     return Promise.resolve(opts)
         .then(opts => {
+            opts.ctx = utils_normailze_elem(opts.ctx)
             return utils_parse_recursive([opts]);
         })
         .map(opts => {
