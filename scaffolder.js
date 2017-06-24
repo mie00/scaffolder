@@ -118,7 +118,7 @@ function utils_normailze_elem(elem, parent) {
 }
 
 
-function utils_parse_recursive(optss, res) {
+function utils_parse_recursive(optss, res, include) {
     if (optss.length === 0)
         return res;
     var more = [];
@@ -126,7 +126,7 @@ function utils_parse_recursive(optss, res) {
         res = [];
     }
     for (var opts of optss) {
-        var tmp = utils_parse_once(opts);
+        var tmp = utils_parse_once(opts, include);
         for (var parsed of tmp) {
             if (parsed.args.length === 0) {
                 res.push(parsed);
@@ -135,10 +135,10 @@ function utils_parse_recursive(optss, res) {
             }
         }
     }
-    return utils_parse_recursive(more, res);
+    return utils_parse_recursive(more, res, include);
 }
 
-function utils_parse_once(opts) {
+function utils_parse_once(opts, include) {
     var res = [];
     if (opts.args.length === 0)
         return [opts];
@@ -153,6 +153,7 @@ function utils_parse_once(opts) {
                     'ctx': ctx,
                     'name': opts.name.slice(),
                     'args': opts.args.slice(1),
+                    'orig': opts.orig.slice(),
                 });
             }
             break;
@@ -161,6 +162,11 @@ function utils_parse_once(opts) {
             var cond = t(opts.ctx);
             opts.args = opts.args.slice(1);
             if (cond)
+                res = [opts];
+            break;
+        case 'includable':
+            opts.args = opts.args.slice(1);
+            if (include)
                 res = [opts];
             break;
         case 'name':
@@ -174,15 +180,15 @@ function utils_parse_once(opts) {
     return res;
 }
 
-function parse_scaf(content, originalname, obj, parentname) {
+function parse_scaf(content, originalname, obj, parentname, include) {
     var opts = {
         'ctx': obj,
         'name': [],
         'args': [],
+        'orig': [],
     };
 
     // TODO: fix later, too slow
-    var orig = [];
     var lines = content.split('\n');
     for (var line of lines) {
         if (line.startsWith(config.prefix)) {
@@ -197,18 +203,24 @@ function parse_scaf(content, originalname, obj, parentname) {
                 case 'cond':
                     opts.args.push({'arg': arg, 'type': 'cond'});
                     break;
+                case 'includable':
+                    opts.args.push({'type': 'includable'});
+                    break;
+                case 'include':
+                    opts.orig.push({'arg': arg, 'type': 'include'});
+                    break;
                 case 'name':
                     opts.args.push({'arg': arg, 'type': 'name'});
                     break;
             }
         } else {
-            orig.push(line);
+            opts.orig.push({'arg': line, 'type': 'template'});
         }
     }
     return Promise.resolve(opts)
         .then(opts => {
             opts.ctx = utils_normailze_elem(opts.ctx);
-            return utils_parse_recursive([opts]);
+            return utils_parse_recursive([opts], undefined, include);
         })
         .map(opts => {
             var name;
@@ -226,7 +238,7 @@ function parse_scaf(content, originalname, obj, parentname) {
             return {
                 'ctx': opts.ctx,
                 'wholename': wholename,
-                'orig': orig.join('\n'),
+                'orig': opts.orig,
             };
         });
 }
@@ -346,28 +358,65 @@ var objwritable = {
     'commit': () => {},
 };
 
-function build_file(obj, reader, writer, file, parentname) {
+var Catcher = function() {
+    this.called = false;
+    this.error = false;
+    this.mkdirp = function(){};
+    this.write = function(_, data) {
+        if (this.called == false) {
+            this.called = true;
+            this.data = data;
+        } else {
+            this.error = true;
+        }
+    };
+};
+
+function build_file(obj, reader, writer, file, parentname, include) {
     return Promise.resolve(reader.read(file))
         .then(content => {
-            return parse_scaf(content, file, obj, parentname);
+            return parse_scaf(content, file, obj, parentname, include);
         })
         .map(opts => {
-            var cont = _.template(opts.orig);
             if (files[opts.wholename] === undefined) {
                 files[opts.wholename] = file;
             } else {
                 throw new ConflictingError(opts.wholename, [files[opts.wholename], file]);
             }
             var wholename = opts.wholename;
-            var text = cont(opts.ctx);
-            var ret = {};
-            var p = !config.dryrun?Promise.resolve(writer.mkdirp(path.dirname(wholename))):Promise.resolve();
-            return p.then(_ => {
-                    if (!config.dryrun)
-                        return writer.write(wholename, text);
+            return Promise.resolve(opts.orig)
+                .map(i => {
+                    if (i.type == 'template')
+                        return i.arg;
+                    else if (i.type == 'include') {
+                        var catcher = new Catcher();
+                        return build_file(opts.ctx, reader, catcher, i.arg, parentname, true)
+                            .then(_ => {
+                                if (catcher.error) {
+                                    // TODO: fix
+                                    throw new Error();
+                                }
+                                if (!catcher.called) {
+                                    // TODO: fix
+                                    throw new Error();
+                                }
+                                return catcher.data;
+
+                            });
+                    }
                 })
-                .then(_ => {ret[wholename] = text; })
-                .return(ret);
+                .then(is => {
+                    var cont = _.template(is.join('\n'));
+                    var text = cont(opts.ctx);
+                    var ret = {};
+                    var p = !config.dryrun?Promise.resolve(writer.mkdirp(path.dirname(wholename))):Promise.resolve();
+                    return p.then(_ => {
+                            if (!config.dryrun)
+                                return writer.write(wholename, text);
+                        })
+                        .then(_ => {ret[wholename] = text; })
+                        .return(ret);
+                });
         })
         .reduce((res, f) => {
             return _.extend(res, f);

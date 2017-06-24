@@ -1,0 +1,2 @@
+-- includable
+<%= _self._v.b %>
