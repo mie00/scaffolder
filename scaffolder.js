@@ -427,6 +427,18 @@ JsonWriter.prototype = objwritable;
 JsonWriter.prototype.constructor = JsonWriter;
 
 
+var YamlWriter = function(file) {
+    var yaml = require('js-yaml');
+    this.wo = {};
+    this.file = file || config.files.scafout;
+    this.commit = () => {
+        return fs.writeFileAsync(this.file, yaml.dump(this.wo), {'encoding': config.encoding})
+            .return(this.wo);
+    };
+};
+YamlWriter.prototype = objwritable;
+YamlWriter.prototype.constructor = YamlWriter;
+
 var FsReader = function(base) {
     this.base = base;
 };
@@ -442,14 +454,14 @@ FsWriter.prototype.constructor = FsWriter;
 function main(args) {
     var defaultargs = {
         'reader': 'fs',
-        'writer': 'json',
+        'writer': 'yaml',
         'in': '.',
         'out': config.files.scafout,
         'ctx': config.files.scafctx,
     };
     args = _.extend(defaultargs, args);
     var reader = args.reader === 'json'?new JsonReader(args['in']):new FsReader(args['in']);
-    var writer = args.writer === 'json'?new JsonWriter(args.out):new FsWriter(args.out);
+    var writer = args.writer === 'json'?new JsonWriter(args.out):args.writer == 'yaml'?new YamlWriter(args.out):new FsWriter(args.out);
     return fs.readFileAsync(args.ctx, config.encoding)
         .then(JSON.parse)
         .then(ctx => build(ctx, reader, writer));
