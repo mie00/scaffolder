@@ -207,7 +207,7 @@ function parse_scaf(content, originalname, obj, parentname) {
     }
     return Promise.resolve(opts)
         .then(opts => {
-            opts.ctx = utils_normailze_elem(opts.ctx)
+            opts.ctx = utils_normailze_elem(opts.ctx);
             return utils_parse_recursive([opts]);
         })
         .map(opts => {
@@ -363,7 +363,6 @@ function build_file(obj, reader, writer, file, parentname) {
             var ret = {};
             var p = !config.dryrun?Promise.resolve(writer.mkdirp(path.dirname(wholename))):Promise.resolve();
             return p.then(_ => {
-                    console.log(wholename, '\n', text);
                     if (!config.dryrun)
                         return writer.write(wholename, text);
                 })
