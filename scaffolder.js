@@ -176,6 +176,9 @@ function utils_parse_once(opts, include) {
             opts.args = opts.args.slice(1);
             res = [opts];
             break;
+	default:
+	    // TODO: better error
+	    throw Error("Didn't understand: " + el.type);
     }
     return res;
 }
@@ -190,6 +193,7 @@ function parse_scaf(content, originalname, obj, parentname, include) {
 
     // TODO: fix later, too slow
     var lines = content.split('\n');
+    var template = false;
     for (var line of lines) {
         if (line.startsWith(config.prefix)) {
             line = line.substring(config.prefix.length);
@@ -197,6 +201,9 @@ function parse_scaf(content, originalname, obj, parentname, include) {
             var op = tmp[0];
             var arg = tmp.length > 1?tmp.slice(1).join(' '):'';
             switch (op) {
+                case 'template':
+                    template = (arg == 'on')?true:false;
+                    break;
                 case 'scope':
                     opts.args.push({'arg': arg, 'type': 'scope'});
                     break;
@@ -214,7 +221,7 @@ function parse_scaf(content, originalname, obj, parentname, include) {
                     break;
             }
         } else {
-            opts.orig.push({'arg': line, 'type': 'template'});
+            opts.orig.push({'arg': line, 'type': template?'template':'literal'});
         }
     }
     return Promise.resolve(opts)
@@ -372,6 +379,22 @@ var Catcher = function() {
     };
 };
 
+function utils_include(ctx, reader, file, template) {
+   var catcher = new Catcher();
+   return build_file(ctx, reader, catcher, file, '', true)
+       .then(_ => {
+           if (catcher.error) {
+               // TODO: fix
+               throw new Error();
+           }
+           if (!catcher.called) {
+               // TODO: fix
+               throw new Error();
+           }
+	   return catcher.data;
+    });
+}
+
 function build_file(obj, reader, writer, file, parentname, include) {
     return Promise.resolve(reader.read(file))
         .then(content => {
@@ -386,28 +409,49 @@ function build_file(obj, reader, writer, file, parentname, include) {
             var wholename = opts.wholename;
             return Promise.resolve(opts.orig)
                 .map(i => {
-                    if (i.type == 'template')
-                        return i.arg;
-                    else if (i.type == 'include') {
-                        var catcher = new Catcher();
-                        return build_file(opts.ctx, reader, catcher, i.arg, parentname, true)
-                            .then(_ => {
-                                if (catcher.error) {
-                                    // TODO: fix
-                                    throw new Error();
-                                }
-                                if (!catcher.called) {
-                                    // TODO: fix
-                                    throw new Error();
-                                }
-                                return catcher.data;
+                    if (i.type == 'include') {
+		        return utils_include(opts.ctx, reader, i.arg)
+		            .then(data => {
+				return {'type': 'include', 'arg': data};
+			    });
 
-                            });
-                    }
+                    } else {
+			return i;
+		    }
                 })
-                .then(is => {
-                    var cont = _.template(is.join('\n'));
-                    var text = cont(opts.ctx);
+	        .then(is => {
+		    var result = [];
+		    var tmp = [];
+		    var template = false;
+		    var nexttemplate;
+		    var cont;
+		    for (var i of is) {
+			nexttemplate = (i.type == 'template')?true:(i.type == 'literal')?false:template;
+			if (template != nexttemplate) {
+		            if (tmp.length) {
+			        if (template == true) {
+                                    cont = _.template(tmp.join('\n'));
+                                    result.push(cont(opts.ctx));
+			        } else {
+			            result.push(tmp.join('\n'));
+			        }
+			    }
+			    tmp = [];
+			    template = nexttemplate;
+			}
+			tmp.push(i.arg);
+		    }
+		    if (tmp.length) {
+		        if (template == true) {
+                            cont = _.template(tmp.join('\n'));
+                            result.push(cont(opts.ctx));
+                        } else {
+		            result.push(tmp.join('\n'));
+		        }
+		    }
+                    return result.join('\n');
+		})
+                .then(text => {
                     var ret = {};
                     var p = !config.dryrun?Promise.resolve(writer.mkdirp(path.dirname(wholename))):Promise.resolve();
                     return p.then(_ => {

@@ -1,2 +1,3 @@
+-- template on
 -- includable
 <%= _self._v.b %>
