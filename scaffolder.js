@@ -14,6 +14,7 @@ var config = {
     },
     'prefix': '-- ',
     'special': '_',
+    'ignore': [],
 };
 
 var keys = {
@@ -52,8 +53,14 @@ function build_recursive(obj, reader, writer, pa, parentname) {
     return Promise.resolve(reader.isdir(pa))
         .then(isdir => {
             if (isdir) {
+                if (utils_ignored(pa, 'dir')) {
+                    return;
+                }
                 return build_dir(obj, reader, writer, pa, parentname);
             } else {
+                if (utils_ignored(pa, 'file')) {
+                    return;
+                }
                 return build_file(obj, reader, writer, pa, parentname);
             }
         });
@@ -176,9 +183,9 @@ function utils_parse_once(opts, include) {
             opts.args = opts.args.slice(1);
             res = [opts];
             break;
-	default:
-	    // TODO: better error
-	    throw Error("Didn't understand: " + el.type);
+        default:
+            // TODO: better error
+            throw Error("Didn't understand: " + el.type);
     }
     return res;
 }
@@ -391,7 +398,7 @@ function utils_include(ctx, reader, file, template) {
                // TODO: fix
                throw new Error();
            }
-	   return catcher.data;
+           return catcher.data;
     });
 }
 
@@ -410,47 +417,47 @@ function build_file(obj, reader, writer, file, parentname, include) {
             return Promise.resolve(opts.orig)
                 .map(i => {
                     if (i.type == 'include') {
-		        return utils_include(opts.ctx, reader, i.arg)
-		            .then(data => {
-				return {'type': 'include', 'arg': data};
-			    });
+                        return utils_include(opts.ctx, reader, i.arg)
+                            .then(data => {
+                                return {'type': 'include', 'arg': data};
+                            });
 
                     } else {
-			return i;
-		    }
+                        return i;
+                    }
                 })
-	        .then(is => {
-		    var result = [];
-		    var tmp = [];
-		    var template = false;
-		    var nexttemplate;
-		    var cont;
-		    for (var i of is) {
-			nexttemplate = (i.type == 'template')?true:(i.type == 'literal')?false:template;
-			if (template != nexttemplate) {
-		            if (tmp.length) {
-			        if (template == true) {
+                .then(is => {
+                    var result = [];
+                    var tmp = [];
+                    var template = false;
+                    var nexttemplate;
+                    var cont;
+                    for (var i of is) {
+                        nexttemplate = (i.type == 'template')?true:(i.type == 'literal')?false:template;
+                        if (template != nexttemplate) {
+                            if (tmp.length) {
+                                if (template == true) {
                                     cont = _.template(tmp.join('\n'));
                                     result.push(cont(opts.ctx));
-			        } else {
-			            result.push(tmp.join('\n'));
-			        }
-			    }
-			    tmp = [];
-			    template = nexttemplate;
-			}
-			tmp.push(i.arg);
-		    }
-		    if (tmp.length) {
-		        if (template == true) {
+                                } else {
+                                    result.push(tmp.join('\n'));
+                                }
+                            }
+                            tmp = [];
+                            template = nexttemplate;
+                        }
+                        tmp.push(i.arg);
+                    }
+                    if (tmp.length) {
+                        if (template == true) {
                             cont = _.template(tmp.join('\n'));
                             result.push(cont(opts.ctx));
                         } else {
-		            result.push(tmp.join('\n'));
-		        }
-		    }
+                            result.push(tmp.join('\n'));
+                        }
+                    }
                     return result.join('\n');
-		})
+                })
                 .then(text => {
                     var ret = {};
                     var p = !config.dryrun?Promise.resolve(writer.mkdirp(path.dirname(wholename))):Promise.resolve();
@@ -465,6 +472,14 @@ function build_file(obj, reader, writer, file, parentname, include) {
         .reduce((res, f) => {
             return _.extend(res, f);
         }, {});
+}
+
+function utils_ignored(file, type) {
+    // TODO: implement
+    if (config.ignore.indexOf(path.basename(file)) != -1) {
+        return true;
+    }
+    return false;
 }
 
 function build(obj, reader, writer, pa, parentname) {
