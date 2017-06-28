@@ -237,9 +237,10 @@ function parse_scaf(content, originalname, obj, parentname, include) {
             return utils_parse_recursive([opts], undefined, include);
         })
         .map(opts => {
-            var name;
+            var name, wholename;
             if (opts.name.length === 0) {
                 name = originalname;
+		wholename = name;
             } else {
                 opts.name = opts.name.filter(x => x);
                 if (opts.name.length === 0) {
@@ -247,8 +248,8 @@ function parse_scaf(content, originalname, obj, parentname, include) {
                 } else {
                     name = path.join.apply(path, opts.name);
                 }
+                wholename = path.join(parentname, name);
             }
-            var wholename = path.join(parentname, name);
             return {
                 'ctx': opts.ctx,
                 'wholename': wholename,
