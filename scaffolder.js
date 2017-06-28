@@ -6,7 +6,7 @@ var mkdirp = Promise.promisify(require('mkdirp'));
 
 var config = {
     'dryrun': false,
-    'encoding': 'utf8',
+    'encoding': 'binary',
     'files': {
         'scaffile': '.scaf',
         'scafout': '.scafout',
