@@ -2,7 +2,7 @@
   "name": "scaffolder",
   "version": "1.0.0",
   "description": "A directory templating language",
-  "main": "index.js",
+  "main": "scaffolder.js",
   "directories": {
     "example": "examples"
   },
