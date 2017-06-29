@@ -132,17 +132,19 @@ function utils_parse_recursive(optss, res, include) {
     if (res === undefined) {
         res = [];
     }
-    for (var opts of optss) {
-        var tmp = utils_parse_once(opts, include);
-        for (var parsed of tmp) {
-            if (parsed.args.length === 0) {
-                res.push(parsed);
-            } else {
-                more.push(parsed);
-            }
-        }
-    }
-    return utils_parse_recursive(more, res, include);
+    return Promise.resolve(optss)
+        .map(opts => {
+            return utils_parse_once(opts, include)
+                .map(parsed => {
+                    if (parsed.args.length === 0) {
+                        res.push(parsed);
+                    } else {
+                        more.push(parsed);
+                    }
+
+		});
+	})
+        .then(_ => utils_parse_recursive(more, res, include));
 }
 
 function utils_parse_once(opts, include) {
@@ -151,6 +153,7 @@ function utils_parse_once(opts, include) {
         return [opts];
 
     var el = opts.args[0];
+    opts.args = opts.args.slice(1);
     var t;
     switch (el.type) {
         case 'scope':
@@ -159,29 +162,30 @@ function utils_parse_once(opts, include) {
                 res.push({
                     'ctx': ctx,
                     'name': opts.name.slice(),
-                    'args': opts.args.slice(1),
+                    'args': opts.args.slice(),
                     'orig': opts.orig.slice(),
                 });
             }
             break;
         case 'cond':
-            t = _.template(el.arg);
-            var cond = t(opts.ctx);
-            opts.args = opts.args.slice(1);
-            if (cond)
-                res = [opts];
+	    res = Promise.resolve(utils_apply_template(el.arg, opts.ctx, {'opts': opts}))
+                .then(cond => {
+                    if (cond)
+                        return [opts];
+	            else
+		        return [];
+		});
             break;
         case 'includable':
-            opts.args = opts.args.slice(1);
             if (include)
                 res = [opts];
             break;
         case 'name':
-            t = _.template(el.arg);
-            var name = t(opts.ctx);
-            opts.name.push(name);
-            opts.args = opts.args.slice(1);
-            res = [opts];
+	    res = Promise.resolve(utils_apply_template(el.arg, opts.ctx, {'opts': opts}))
+                .then(name => {
+                    opts.name.push(name);
+                    return [opts];
+		});
             break;
         default:
             // TODO: better error
@@ -403,6 +407,20 @@ function utils_include(ctx, reader, file, template) {
     });
 }
 
+function utils_parse_template_error(string, info, error) {
+    // TODO: better error representation
+    info = info || {};
+    console.error(info);
+    console.error(string);
+    throw error;
+}
+
+function utils_apply_template(text, ctx, info) {
+    return Promise.resolve(_.template(text))
+        .then(cont => cont(ctx))
+        .catch(utils_parse_template_error.bind(null, text, info));
+}
+
 function build_file(obj, reader, writer, file, parentname, include) {
     return Promise.resolve(reader.read(file))
         .then(content => {
@@ -430,35 +448,32 @@ function build_file(obj, reader, writer, file, parentname, include) {
                 .then(is => {
                     var result = [];
                     var tmp = [];
-                    var template = false;
-                    var nexttemplate;
-                    var cont;
+                    var type = 'literal';
+                    var nexttype;
                     for (var i of is) {
-                        nexttemplate = (i.type == 'template')?true:(i.type == 'literal')?false:template;
-                        if (template != nexttemplate) {
+                        nexttype = (i.type == 'template')?'template':(i.type == 'literal')?'literal':type;
+                        if (type != nexttype) {
                             if (tmp.length) {
-                                if (template == true) {
-                                    cont = _.template(tmp.join('\n'));
-                                    result.push(cont(opts.ctx));
-                                } else {
-                                    result.push(tmp.join('\n'));
-                                }
+                                result.push({'type': type, 'arg': tmp.join('\n')});
                             }
                             tmp = [];
-                            template = nexttemplate;
+                            type = nexttype;
                         }
                         tmp.push(i.arg);
                     }
                     if (tmp.length) {
-                        if (template == true) {
-                            cont = _.template(tmp.join('\n'));
-                            result.push(cont(opts.ctx));
-                        } else {
-                            result.push(tmp.join('\n'));
-                        }
+                        result.push({'type': type, 'arg': tmp.join('\n')});
                     }
-                    return result.join('\n');
+                    return result;
                 })
+		.map(i => {
+                    if (i.type == 'template') {
+                        return utils_apply_template(i.arg, opts.ctx, {'file': file});
+                    } else {
+                        return i.arg;
+                    }
+		})
+		.then(is => is.join('\n'))
                 .then(text => {
                     var ret = {};
                     var p = !config.dryrun?Promise.resolve(writer.mkdirp(path.dirname(wholename))):Promise.resolve();
