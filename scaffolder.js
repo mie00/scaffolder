@@ -111,6 +111,7 @@ function utils_parse_scope(obj, scopestr) {
 }
 
 function utils_normailze_elem(elem, parent) {
+    parent = parent || elem[keys.parent];
     var root = parent?parent[keys.root] || parent:elem;
     if (!_.isObject(elem)) {
         var tmp = {};
@@ -394,12 +395,8 @@ var Catcher = function() {
 function utils_include(ctx, reader, file, template) {
    var catcher = new Catcher();
    return build_file(ctx, reader, catcher, file, '', true)
-       .then(_ => {
+       .then(r => {
            if (catcher.error) {
-               // TODO: fix
-               throw new Error();
-           }
-           if (!catcher.called) {
                // TODO: fix
                throw new Error();
            }
@@ -430,13 +427,14 @@ function build_file(obj, reader, writer, file, parentname, include) {
             if (files[opts.wholename] === undefined) {
                 files[opts.wholename] = file;
             } else {
-                throw new ConflictingError(opts.wholename, [files[opts.wholename], file]);
+                if (!include)
+                    throw new ConflictingError(opts.wholename, [files[opts.wholename], file]);
             }
             var wholename = opts.wholename;
             return Promise.resolve(opts.orig)
                 .map(i => {
                     if (i.type == 'include') {
-                        return utils_include(opts.ctx, reader, i.arg)
+                        return utils_include(opts.ctx, reader, path.join(path.dirname(file), i.arg))
                             .then(data => {
                                 return {'type': 'include', 'arg': data};
                             });
