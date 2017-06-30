@@ -169,9 +169,9 @@ function utils_parse_once(opts, include) {
             }
             break;
         case 'cond':
-	    res = Promise.resolve(utils_apply_template(el.arg, opts.ctx, {'opts': opts}))
+	    res = Promise.resolve(utils_apply_template("<%= !!(" + el.arg + ") %>", opts.ctx, {'opts': opts}))
                 .then(cond => {
-                    if (cond)
+                    if (cond == 'true')
                         return [opts];
 	            else
 		        return [];
