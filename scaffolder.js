@@ -413,7 +413,8 @@ function utils_parse_template_error(string, info, error) {
 }
 
 function utils_apply_template(text, ctx, info) {
-    return Promise.resolve(_.template(text))
+    return Promise.resolve()
+        .then(() => _.template(text))
         .then(cont => cont(ctx))
         .catch(utils_parse_template_error.bind(null, text, info));
 }
