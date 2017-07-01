@@ -458,6 +458,8 @@ function build_file(obj, reader, writer, file, parentname, include) {
                             tmp = [];
                             type = nexttype;
                         }
+			if (i.type == 'include' && i.arg === undefined)
+                            continue;
                         tmp.push(i.arg);
                     }
                     if (tmp.length) {
