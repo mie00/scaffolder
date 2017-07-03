@@ -44,7 +44,9 @@ function NotFoundError(pa) {
 NotFoundError.prototype = Object.create(Error.prototype);
 NotFoundError.prototype.constructor = NotFoundError;
 
-var files = {};
+var runtime = {
+    'files': {},
+}
 
 function build_recursive(obj, reader, writer, pa, parentname) {
     if (parentname === undefined) {
@@ -425,11 +427,11 @@ function build_file(obj, reader, writer, file, parentname, include) {
             return parse_scaf(content, file, obj, parentname, include);
         })
         .map(opts => {
-            if (files[opts.wholename] === undefined) {
-                files[opts.wholename] = file;
+            if (runtime.files[opts.wholename] === undefined) {
+                runtime.files[opts.wholename] = file;
             } else {
                 if (!include)
-                    throw new ConflictingError(opts.wholename, [files[opts.wholename], file]);
+                    throw new ConflictingError(opts.wholename, [runtime.files[opts.wholename], file]);
             }
             var wholename = opts.wholename;
             return Promise.resolve(opts.orig)
@@ -610,4 +612,5 @@ module.exports = {
     },
     'build': build,
     'main': main,
+    'runtime': runtime,
 };
