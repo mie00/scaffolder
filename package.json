@@ -9,6 +9,9 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
+  "bin": {
+    "scaffolder": "bin/cli"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/mie00/scaffolder.git"
@@ -30,6 +33,7 @@
     "bluebird": "^3.5.0",
     "js-yaml": "^3.8.4",
     "lodash": "^4.17.4",
-    "mkdirp": "^0.5.1"
+    "mkdirp": "^0.5.1",
+    "yargs": "^8.0.2"
   }
 }

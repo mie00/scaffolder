@@ -1,0 +1,77 @@
+#!/usr/bin/env node
+var scaffolder = require('scaffolder');
+var path = require('path');
+
+const argv = require('yargs') // eslint-disable-line 
+.options({
+    reader: {
+        alias: 'r',
+        description: 'reader engine (one of: ' + Object.keys(scaffolder.readers).join(', ') + ')',
+        default: 'fs',
+        requiresArg: true,
+    },
+    writer: {
+        alias: 'w',
+        description: 'writer engine (one of: ' + Object.keys(scaffolder.readers).join(', ') + ')',
+        default: 'fs',
+        requiresArg: true,
+    },
+    'in': {
+        alias: 'i',
+        description: 'input file/directory',
+        default: '.',
+        requiresArg: true,
+    },
+    out: {
+        alias: 'o',
+        description: 'output file/directory',
+        default: 'out',
+        requiresArg: true,
+    },
+    ignore: {
+        alias: 'g',
+        description: 'files/directories to ignore (specify multiple times --g out -g Makefile)',
+        default: ['out', '.scafctx'],
+        requiresArg: true,
+    },
+    prefix: {
+        alias: 'p',
+        description: 'prefix of the scaffolder command, including a trailing space if any',
+        default: '//-- ',
+        requiresArg: true,
+    },
+    context: {
+        alias: 'c',
+        description: 'context file js/json',
+        default: '.scafctx',
+        requiresArg: true,
+    },
+})
+.alias('h', 'help')
+.help()
+.argv;
+
+if (argv.ignore && typeof argv.ignore === 'string') {
+    argv.ignore = [argv.ignore];
+}
+if (!path.isAbsolute(argv.context)) {
+    argv.context = path.join(process.cwd(), argv.context);
+}
+
+var reader = scaffolder.readers[argv.reader];
+if (!reader) {
+    console.error("unknown error: " + argv.reader);
+    process.exit(1);
+}
+
+var writer = scaffolder.writers[argv.writer];
+if (!writer) {
+    console.error("unknown error: " + argv.writer);
+    process.exit(1);
+}
+
+const config = require(argv.context);
+
+scaffolder.config.prefix = argv.prefix;
+scaffolder.config.ignore = argv.ignore;
+scaffolder.build(config, new scaffolder.readers.fs(argv['in']), new scaffolder.writers.fs(argv.out)).then(function(){});
